@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, FormEvent, ReactNode, useState } from "react";
+import { Component, ErrorInfo, FormEvent, ReactNode, useEffect, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,7 +19,7 @@ import {
   Sun,
   Users,
 } from "lucide-react";
-import { api, clearTokens, getAccessToken, saveTokens } from "./api/client";
+import { api, clearTokens, getAccessToken, saveTokens, subscribeAuthExpired } from "./api/client";
 import type { Appointment, Patient, Professional, Room, ClinicService } from "./api/types";
 import { useCoreData } from "./hooks/useCoreData";
 import { Badge, EmptyState, ErrorBlock, Field, LoadingBlock, PageHeader, Panel } from "./components/ui";
@@ -138,6 +138,8 @@ export default function App() {
   const { t } = usePreferences();
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAccessToken()));
 
+  useEffect(() => subscribeAuthExpired(() => setIsAuthenticated(false)), []);
+
   if (!isAuthenticated) {
     return <LoginPage onLoggedIn={() => setIsAuthenticated(true)} />;
   }
@@ -208,13 +210,25 @@ function PreferencesControl() {
       >
         {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
       </button>
-      <label className="select-pill" title={t("Language")}>
+      <div className="language-switch" title={t("Language")}>
         <Languages size={16} />
-        <select value={language} onChange={(event) => setLanguage(event.target.value === "es" ? "es" : "en")}>
-          <option value="en">{t("English")}</option>
-          <option value="es">{t("Spanish")}</option>
-        </select>
-      </label>
+        <button
+          type="button"
+          className={language === "en" ? "language-option language-option-active" : "language-option"}
+          onClick={() => setLanguage("en")}
+          aria-pressed={language === "en"}
+        >
+          EN
+        </button>
+        <button
+          type="button"
+          className={language === "es" ? "language-option language-option-active" : "language-option"}
+          onClick={() => setLanguage("es")}
+          aria-pressed={language === "es"}
+        >
+          ES
+        </button>
+      </div>
     </div>
   );
 }

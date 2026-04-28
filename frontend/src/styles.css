@@ -21,6 +21,7 @@
   --field-label: #344054;
   --brand: #0f766e;
   --brand-strong: #0b5f59;
+  --brand-contrast: #ffffff;
   --accent: #2563eb;
   --good: #157347;
   --warn: #a15c06;
@@ -47,6 +48,7 @@ html[data-theme="dark"] {
   --field-label: #d4dee9;
   --brand: #2dd4bf;
   --brand-strong: #5eead4;
+  --brand-contrast: #062621;
   --accent: #60a5fa;
   --good: #86efac;
   --warn: #fbbf24;
@@ -261,25 +263,46 @@ small {
   padding: 0;
 }
 
-.select-pill {
+.language-switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 0 0.55rem;
+  padding: 0 0.35rem 0 0.55rem;
   color: var(--text);
   background: var(--control);
 }
 
-.select-pill select {
-  min-height: 34px;
-  min-width: 92px;
+.language-switch svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.language-option {
+  min-width: 34px;
+  min-height: 28px;
   border: 0;
-  padding: 0;
+  border-radius: 5px;
+  padding: 0 0.45rem;
+  color: var(--muted);
   background: transparent;
   box-shadow: none;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.language-option:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+  background: var(--control-hover);
+}
+
+.language-option-active,
+.language-option-active:hover:not(:disabled) {
+  color: var(--brand-contrast);
+  background: var(--brand);
 }
 
 .page-header {

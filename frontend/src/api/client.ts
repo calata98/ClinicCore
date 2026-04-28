@@ -21,6 +21,9 @@ import type {
 
 const ACCESS_TOKEN_KEY = "cliniccore.accessToken";
 const REFRESH_TOKEN_KEY = "cliniccore.refreshToken";
+const AUTH_EXPIRED_EVENT = "cliniccore:auth-expired";
+
+let refreshPromise: Promise<boolean> | null = null;
 
 export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -40,13 +43,27 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+export function subscribeAuthExpired(handler: () => void) {
+  window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+  return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
+}
+
+function notifyAuthExpired() {
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : undefined;
+  let payload: unknown;
+  try {
+    payload = text ? JSON.parse(text) : undefined;
+  } catch {
+    payload = undefined;
+  }
 
   if (!response.ok) {
     const problem = payload as ProblemDetail | undefined;
@@ -56,7 +73,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return payload as T;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+function buildRequestInit(init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = getAccessToken();
 
@@ -67,7 +84,54 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(path, { ...init, headers });
+  return { ...init, headers };
+}
+
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return false;
+  }
+
+  refreshPromise ??= (async () => {
+    const response = await fetch("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: jsonBody({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      clearTokens();
+      notifyAuthExpired();
+      return false;
+    }
+
+    const tokens = await parseResponse<AuthTokens>(response);
+    saveTokens(tokens);
+    return true;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
+
+function shouldTryRefresh(path: string, response: Response) {
+  return !path.startsWith("/api/auth/") && (response.status === 401 || response.status === 403);
+}
+
+async function request<T>(path: string, init: RequestInit = {}, retryOnUnauthorized = true): Promise<T> {
+  const response = await fetch(path, buildRequestInit(init));
+
+  if (retryOnUnauthorized && shouldTryRefresh(path, response) && (await refreshAccessToken())) {
+    return request<T>(path, init, false);
+  }
+
+  if (retryOnUnauthorized && shouldTryRefresh(path, response)) {
+    clearTokens();
+    notifyAuthExpired();
+  }
+
   return parseResponse<T>(response);
 }
 
@@ -85,7 +149,7 @@ export const api = {
     request<AuthTokens>("/api/auth/refresh", {
       method: "POST",
       body: jsonBody({ refreshToken }),
-    }),
+    }, false),
   me: () => request<UserProfile>("/api/auth/me"),
   health: () => request<{ status: string }>("/actuator/health"),
 
