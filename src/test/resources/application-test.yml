@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:cliniccore;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+cliniccore:
+  bootstrap-demo: true
+  security:
+    jwt-secret: test-secret-for-cliniccore-with-32-chars

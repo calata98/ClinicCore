@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: ClinicCore
+  datasource:
+    url: ${CLINICCORE_DB_URL:jdbc:postgresql://localhost:5432/cliniccore}
+    username: ${CLINICCORE_DB_USERNAME:cliniccore}
+    password: ${CLINICCORE_DB_PASSWORD:cliniccore}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+
+cliniccore:
+  bootstrap-demo: ${CLINICCORE_BOOTSTRAP_DEMO:true}
+  security:
+    jwt-secret: ${CLINICCORE_JWT_SECRET:change-this-dev-secret-with-at-least-32-chars}
+    access-token-minutes: ${CLINICCORE_ACCESS_TOKEN_MINUTES:20}
+    refresh-token-days: ${CLINICCORE_REFRESH_TOKEN_DAYS:14}
