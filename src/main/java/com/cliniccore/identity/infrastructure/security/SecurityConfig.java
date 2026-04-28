@@ -28,10 +28,11 @@ public class SecurityConfig {
 		http.csrf(AbstractHttpConfigurer::disable)
 				.httpBasic(AbstractHttpConfigurer::disable)
 				.formLogin(AbstractHttpConfigurer::disable)
+				.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()))
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/**", "/actuator/health", "/v3/api-docs/**", "/swagger-ui/**",
-								"/swagger-ui.html")
+								"/swagger-ui.html", "/h2-console/**")
 						.permitAll()
 						.anyRequest()
 						.authenticated())

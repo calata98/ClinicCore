@@ -41,7 +41,35 @@ Not included yet: legal invoicing, file attachments, digital signatures, email r
 Requirements:
 
 - JDK 25
-- Docker, or a compatible local PostgreSQL instance
+- Docker, or a compatible local PostgreSQL instance, for the default PostgreSQL profile
+
+### Fast IntelliJ Setup Without Docker
+
+Use the `local` Spring profile when you want to run the application directly from IntelliJ IDEA without Docker or PostgreSQL.
+
+In the Spring Boot run configuration, set:
+
+```text
+Active profiles: local
+```
+
+Or start it from PowerShell:
+
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+The `local` profile uses a file-based H2 database under `.local-data/`, keeps Flyway enabled, and exposes the H2 console at `http://localhost:8080/h2-console`.
+
+### PostgreSQL Setup With Docker
+
+If Docker Desktop is not installed yet, run this script from an elevated PowerShell terminal:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-docker-desktop.ps1
+```
+
+If the script is not already running as Administrator, it will ask Windows to relaunch it with UAC. Docker Desktop may require Windows to restart after installation. After restarting, open Docker Desktop once before running `docker compose`.
 
 Start PostgreSQL:
 
@@ -72,6 +100,7 @@ The API will be available at:
 - `http://localhost:8080`
 - Swagger UI: `http://localhost:8080/swagger-ui`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- H2 console when using the `local` profile: `http://localhost:8080/h2-console`
 
 ## Demo User
 
