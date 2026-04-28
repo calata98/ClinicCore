@@ -9,17 +9,21 @@ import {
   FileClock,
   Home,
   LogOut,
+  Languages,
+  Moon,
   PackageCheck,
   PanelLeft,
   Plus,
   Search,
   Stethoscope,
+  Sun,
   Users,
 } from "lucide-react";
 import { api, clearTokens, getAccessToken, saveTokens } from "./api/client";
 import type { Appointment, Patient, Professional, Room, ClinicService } from "./api/types";
 import { useCoreData } from "./hooks/useCoreData";
 import { Badge, EmptyState, ErrorBlock, Field, LoadingBlock, PageHeader, Panel } from "./components/ui";
+import { usePreferences } from "./preferences/preferences";
 
 type CoreData = ReturnType<typeof useCoreData>;
 
@@ -50,21 +54,23 @@ function toInstant(value: string) {
   return new Date(value).toISOString();
 }
 
-function formatDateTime(value?: string) {
+function formatDateTime(value?: string, language: "en" | "es" = "en") {
   if (!value) {
     return "-";
   }
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
-function money(value?: number) {
-  return new Intl.NumberFormat("en", { style: "currency", currency: "EUR" }).format(value ?? 0);
+function money(value?: number, language: "en" | "es" = "en") {
+  return new Intl.NumberFormat(language === "es" ? "es-ES" : "en", { style: "currency", currency: "EUR" }).format(
+    value ?? 0,
+  );
 }
 
-class AppErrorBoundary extends Component<{ children: ReactNode }, { message: string | null }> {
+class AppErrorBoundary extends Component<{ children: ReactNode; title: string }, { message: string | null }> {
   state = { message: null };
 
   static getDerivedStateFromError(_error: Error) {
@@ -79,7 +85,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { message: str
     if (this.state.message) {
       return (
         <main className="content">
-          <Panel title="Application error">
+          <Panel title={this.props.title}>
             <ErrorBlock message={this.state.message} />
           </Panel>
         </main>
@@ -129,6 +135,7 @@ function useRefresh(keys: string[]) {
 }
 
 export default function App() {
+  const { t } = usePreferences();
   const [isAuthenticated, setIsAuthenticated] = useState(Boolean(getAccessToken()));
 
   if (!isAuthenticated) {
@@ -136,13 +143,14 @@ export default function App() {
   }
 
   return (
-    <AppErrorBoundary>
+    <AppErrorBoundary title={t("Application error")}>
       <AuthenticatedApp onLogout={() => setIsAuthenticated(false)} />
     </AppErrorBoundary>
   );
 }
 
 function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const { t } = usePreferences();
   const [email, setEmail] = useState("owner@cliniccore.local");
   const [password, setPassword] = useState("ChangeMe123!");
   const login = useMutation({
@@ -156,11 +164,14 @@ function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   return (
     <main className="login-layout">
       <section className="login-panel">
+        <div className="login-preferences">
+          <PreferencesControl />
+        </div>
         <div className="brand-mark">
           <Activity size={28} />
         </div>
         <span className="eyebrow">ClinicCore</span>
-        <h1>Clinic operations</h1>
+        <h1>{t("Clinic operations")}</h1>
         <form
           className="stack-form"
           onSubmit={(event) => {
@@ -168,15 +179,15 @@ function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
             login.mutate();
           }}
         >
-          <Field label="Email">
+          <Field label={t("Email")}>
             <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required />
           </Field>
-          <Field label="Password">
+          <Field label={t("Password")}>
             <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" required />
           </Field>
           {login.error ? <ErrorBlock message={mutationError(login.error)} /> : null}
           <button className="primary-button" type="submit" disabled={login.isPending}>
-            {login.isPending ? "Signing in..." : "Sign in"}
+            {login.isPending ? t("Signing in...") : t("Sign in")}
           </button>
         </form>
       </section>
@@ -184,9 +195,34 @@ function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   );
 }
 
+function PreferencesControl() {
+  const { language, setLanguage, setTheme, t, theme } = usePreferences();
+
+  return (
+    <div className="preferences-control" aria-label={`${t("Theme")} / ${t("Language")}`}>
+      <button
+        type="button"
+        className="icon-button"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        title={theme === "dark" ? t("Light theme") : t("Dark theme")}
+      >
+        {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+      <label className="select-pill" title={t("Language")}>
+        <Languages size={16} />
+        <select value={language} onChange={(event) => setLanguage(event.target.value === "es" ? "es" : "en")}>
+          <option value="en">{t("English")}</option>
+          <option value="es">{t("Spanish")}</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
 function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
   const data = useCoreData(true);
   const navigate = useNavigate();
+  const { t } = usePreferences();
 
   function logout() {
     clearTokens();
@@ -207,22 +243,23 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
             return (
               <NavLink key={item.to} to={item.to} end={item.to === "/"}>
                 <Icon size={18} />
-                {item.label}
+                {t(item.label)}
               </NavLink>
             );
           })}
         </nav>
         <button className="ghost-button sidebar-logout" onClick={logout} type="button">
           <LogOut size={16} />
-          Sign out
+          {t("Sign out")}
         </button>
       </aside>
 
       <main className="content">
         <div className="topbar">
           <PanelLeft size={18} />
-          <span>{data.clinic.data?.name ?? "Clinic workspace"}</span>
+          <span>{data.clinic.data?.name ?? t("Clinic workspace")}</span>
           {data.profile.data ? <Badge tone="good">{data.profile.data.role}</Badge> : null}
+          <PreferencesControl />
         </div>
         <Routes>
           <Route path="/" element={<DashboardPage data={data} />} />
@@ -240,40 +277,41 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
 }
 
 function DashboardPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
   const dashboard = data.dashboard.data;
   const appointments = data.appointments.data ?? [];
 
   return (
     <>
-      <PageHeader title="Dashboard" eyebrow="Today" />
+      <PageHeader title={t("Dashboard")} eyebrow={t("Today")} />
       {data.dashboard.isLoading ? <LoadingBlock /> : null}
       {data.dashboard.error ? <ErrorBlock message={mutationError(data.dashboard.error)} /> : null}
       <section className="metric-grid">
-        <Metric label="Next 7 days" value={dashboard?.appointmentsNextSevenDays ?? 0} />
-        <Metric label="Active patients" value={dashboard?.activePatients ?? 0} />
-        <Metric label="Open episodes" value={dashboard?.openEpisodes ?? 0} />
-        <Metric label="Active packages" value={dashboard?.activePackages ?? 0} />
-        <Metric label="Income" value={money(dashboard?.registeredIncome)} />
-        <Metric label="No-shows 30d" value={dashboard?.noShowsLastThirtyDays ?? 0} />
+        <Metric label={t("Next 7 days")} value={dashboard?.appointmentsNextSevenDays ?? 0} />
+        <Metric label={t("Active patients")} value={dashboard?.activePatients ?? 0} />
+        <Metric label={t("Open episodes")} value={dashboard?.openEpisodes ?? 0} />
+        <Metric label={t("Active packages")} value={dashboard?.activePackages ?? 0} />
+        <Metric label={t("Income")} value={money(dashboard?.registeredIncome, language)} />
+        <Metric label={t("No-shows 30d")} value={dashboard?.noShowsLastThirtyDays ?? 0} />
       </section>
       <div className="two-column">
-        <Panel title="Upcoming appointments">
+        <Panel title={t("Upcoming appointments")}>
           <AppointmentList appointments={appointments.slice(0, 6)} data={data} compact />
         </Panel>
-        <Panel title="Clinic workload">
+        <Panel title={t("Clinic workload")}>
           <div className="list">
             <div className="list-row">
-              <span>Cancelled next 7 days</span>
+              <span>{t("Cancelled next 7 days")}</span>
               <Badge tone={dashboard?.cancelledNextSevenDays ? "warn" : "good"}>
                 {dashboard?.cancelledNextSevenDays ?? 0}
               </Badge>
             </div>
             <div className="list-row">
-              <span>Open treatment episodes</span>
+              <span>{t("Open treatment episodes")}</span>
               <Badge>{dashboard?.openEpisodes ?? 0}</Badge>
             </div>
             <div className="list-row">
-              <span>Active patient packages</span>
+              <span>{t("Active patient packages")}</span>
               <Badge>{dashboard?.activePackages ?? 0}</Badge>
             </div>
           </div>
@@ -293,6 +331,7 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 }
 
 function ClinicPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
   const refreshClinic = useRefresh(["professionals", "rooms", "services"]);
   const createProfessional = useMutation({ mutationFn: api.createProfessional, onSuccess: refreshClinic });
   const createRoom = useMutation({ mutationFn: api.createRoom, onSuccess: refreshClinic });
@@ -332,42 +371,42 @@ function ClinicPage({ data }: { data: CoreData }) {
 
   return (
     <>
-      <PageHeader title="Clinic setup" eyebrow={data.clinic.data?.name ?? "Workspace"} />
+      <PageHeader title={t("Clinic setup")} eyebrow={data.clinic.data?.name ?? t("Workspace")} />
       <div className="three-column">
-        <Panel title="Professionals">
+        <Panel title={t("Professionals")}>
           <form className="compact-form" onSubmit={submitProfessional}>
-            <input name="firstName" placeholder="First name" required />
-            <input name="lastName" placeholder="Last name" required />
-            <input name="email" placeholder="Email" type="email" />
-            <input name="phone" placeholder="Phone" />
-            <input name="color" defaultValue="#0f766e" type="color" aria-label="Color" />
+            <input name="firstName" placeholder={t("First name")} required />
+            <input name="lastName" placeholder={t("Last name")} required />
+            <input name="email" placeholder={t("Email")} type="email" />
+            <input name="phone" placeholder={t("Phone")} />
+            <input name="color" defaultValue="#0f766e" type="color" aria-label={t("Color")} />
             <button type="submit">
               <Plus size={16} />
-              Add
+              {t("Add")}
             </button>
           </form>
           <EntityList items={data.professionals.data ?? []} render={(item) => `${item.firstName} ${item.lastName}`} />
           {createProfessional.error ? <ErrorBlock message={mutationError(createProfessional.error)} /> : null}
         </Panel>
-        <Panel title="Rooms">
+        <Panel title={t("Rooms")}>
           <form className="inline-form" onSubmit={submitRoom}>
-            <input name="name" placeholder="Room name" required />
+            <input name="name" placeholder={t("Room name")} required />
             <button type="submit">
               <Plus size={16} />
-              Add
+              {t("Add")}
             </button>
           </form>
           <EntityList items={data.rooms.data ?? []} render={(item) => item.name} />
           {createRoom.error ? <ErrorBlock message={mutationError(createRoom.error)} /> : null}
         </Panel>
-        <Panel title="Services">
+        <Panel title={t("Services")}>
           <form className="compact-form" onSubmit={submitService}>
-            <input name="name" placeholder="Service name" required />
+            <input name="name" placeholder={t("Service name")} required />
             <input name="durationMinutes" defaultValue={45} min={1} type="number" required />
             <input name="price" defaultValue={45} min={0} step="0.01" type="number" />
             <button type="submit">
               <Plus size={16} />
-              Add
+              {t("Add")}
             </button>
           </form>
           <div className="list">
@@ -375,7 +414,7 @@ function ClinicPage({ data }: { data: CoreData }) {
               <div className="list-row" key={item.id}>
                 <span>{item.name}</span>
                 <small>
-                  {item.durationMinutes} min · {money(item.price)}
+                  {item.durationMinutes} min · {money(item.price, language)}
                 </small>
               </div>
             ))}
@@ -388,9 +427,11 @@ function ClinicPage({ data }: { data: CoreData }) {
 }
 
 function EntityList<T extends { id: string }>({ items, render }: { items: T[]; render: (item: T) => string }) {
+  const { t } = usePreferences();
+
   return (
     <div className="list">
-      {items.length === 0 ? <EmptyState title="No records yet" /> : null}
+      {items.length === 0 ? <EmptyState title={t("No records yet")} /> : null}
       {items.map((item) => (
         <div className="list-row" key={item.id}>
           <span>{render(item)}</span>
@@ -401,6 +442,7 @@ function EntityList<T extends { id: string }>({ items, render }: { items: T[]; r
 }
 
 function PatientsPage() {
+  const { t } = usePreferences();
   const [search, setSearch] = useState("");
   const refreshPatients = useRefresh(["patients", "dashboard"]);
   const searchedPatients = useQuery({
@@ -426,44 +468,44 @@ function PatientsPage() {
 
   return (
     <>
-      <PageHeader title="Patients" eyebrow="Administrative record" />
+      <PageHeader title={t("Patients")} eyebrow={t("Administrative record")} />
       <div className="two-column">
-        <Panel title="Create patient">
+        <Panel title={t("Create patient")}>
           <form className="stack-form" onSubmit={submitPatient}>
             <div className="form-grid">
-              <Field label="First name">
+              <Field label={t("First name")}>
                 <input name="firstName" required />
               </Field>
-              <Field label="Last name">
+              <Field label={t("Last name")}>
                 <input name="lastName" required />
               </Field>
-              <Field label="Phone">
+              <Field label={t("Phone")}>
                 <input name="phone" />
               </Field>
-              <Field label="Email">
+              <Field label={t("Email")}>
                 <input name="email" type="email" />
               </Field>
-              <Field label="Birth date">
+              <Field label={t("Birth date")}>
                 <input name="birthDate" type="date" />
               </Field>
             </div>
-            <Field label="Administrative notes">
+            <Field label={t("Administrative notes")}>
               <textarea name="administrativeNotes" rows={4} />
             </Field>
             <label className="checkbox-line">
               <input name="consentAccepted" type="checkbox" defaultChecked />
-              Consent accepted
+              {t("Consent accepted")}
             </label>
-            <button className="primary-button" type="submit">Create patient</button>
+            <button className="primary-button" type="submit">{t("Create patient")}</button>
             {createPatient.error ? <ErrorBlock message={mutationError(createPatient.error)} /> : null}
           </form>
         </Panel>
         <Panel
-          title="Patient directory"
+          title={t("Patient directory")}
           action={
             <div className="search-box">
               <Search size={16} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("Search")} />
             </div>
           }
         >
@@ -474,14 +516,14 @@ function PatientsPage() {
                   <strong>
                     {patient.firstName} {patient.lastName}
                   </strong>
-                  <small>{patient.email || patient.phone || "No contact data"}</small>
+                  <small>{patient.email || patient.phone || t("No contact data")}</small>
                 </div>
                 <Badge tone={patient.consentAccepted ? "good" : "warn"}>
-                  {patient.consentAccepted ? "Consent" : "Pending"}
+                  {patient.consentAccepted ? t("Consent") : t("Pending")}
                 </Badge>
               </div>
             ))}
-            {searchedPatients.data?.length === 0 ? <EmptyState title="No patients found" /> : null}
+            {searchedPatients.data?.length === 0 ? <EmptyState title={t("No patients found")} /> : null}
           </div>
         </Panel>
       </div>
@@ -490,6 +532,7 @@ function PatientsPage() {
 }
 
 function AgendaPage({ data }: { data: CoreData }) {
+  const { t } = usePreferences();
   const refreshAgenda = useRefresh(["appointments", "dashboard", "auditLogs"]);
   const createAppointment = useMutation({ mutationFn: api.createAppointment, onSuccess: refreshAgenda });
   const complete = useMutation({ mutationFn: api.completeAppointment, onSuccess: refreshAgenda });
@@ -512,43 +555,43 @@ function AgendaPage({ data }: { data: CoreData }) {
 
   return (
     <>
-      <PageHeader title="Agenda" eyebrow="Scheduling" />
+      <PageHeader title={t("Agenda")} eyebrow={t("Scheduling")} />
       <div className="two-column agenda-layout">
-        <Panel title="Create appointment">
+        <Panel title={t("Create appointment")}>
           <form className="stack-form" onSubmit={submitAppointment}>
-            <SelectField label="Patient" name="patientId" items={data.patients.data ?? []} render={patientNameOption} />
-            <SelectField label="Professional" name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
-            <SelectField label="Room" name="roomId" items={data.rooms.data ?? []} render={(item) => item.name} />
-            <SelectField label="Service" name="serviceId" items={data.services.data ?? []} render={(item) => `${item.name} · ${item.durationMinutes} min`} />
+            <SelectField label={t("Patient")} name="patientId" items={data.patients.data ?? []} render={patientNameOption} />
+            <SelectField label={t("Professional")} name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
+            <SelectField label={t("Room")} name="roomId" items={data.rooms.data ?? []} render={(item) => item.name} />
+            <SelectField label={t("Service")} name="serviceId" items={data.services.data ?? []} render={(item) => `${item.name} · ${item.durationMinutes} min`} />
             <div className="form-grid">
-              <Field label="Start">
+              <Field label={t("Start")}>
                 <input name="startAt" type="datetime-local" defaultValue={dateTimeLocal(1, 10)} required />
               </Field>
-              <Field label="End">
+              <Field label={t("End")}>
                 <input name="endAt" type="datetime-local" defaultValue={dateTimeLocal(1, 10, 45)} required />
               </Field>
             </div>
-            <Field label="Reason">
-              <input name="reason" placeholder="Session reason" />
+            <Field label={t("Reason")}>
+              <input name="reason" placeholder={t("Session reason")} />
             </Field>
-            <button className="primary-button" type="submit">Create appointment</button>
+            <button className="primary-button" type="submit">{t("Create appointment")}</button>
             {createAppointment.error ? <ErrorBlock message={mutationError(createAppointment.error)} /> : null}
           </form>
         </Panel>
-        <Panel title="Appointments">
+        <Panel title={t("Appointments")}>
           <AppointmentList
             appointments={data.appointments.data ?? []}
             data={data}
             actions={(appointment) => (
               <div className="row-actions">
                 <button type="button" onClick={() => complete.mutate(appointment.id)} disabled={appointment.status !== "SCHEDULED"}>
-                  Complete
+                  {t("Complete")}
                 </button>
                 <button type="button" onClick={() => noShow.mutate(appointment.id)} disabled={appointment.status !== "SCHEDULED"}>
-                  No-show
+                  {t("No-show")}
                 </button>
                 <button type="button" onClick={() => cancel.mutate(appointment.id)} disabled={appointment.status !== "SCHEDULED"}>
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
             )}
@@ -570,24 +613,30 @@ function AppointmentList({
   compact?: boolean;
   actions?: (appointment: Appointment) => ReactNode;
 }) {
+  const { language, t } = usePreferences();
+
   if (appointments.length === 0) {
-    return <EmptyState title="No appointments" />;
+    return <EmptyState title={t("No appointments")} />;
   }
 
   return (
     <div className="timeline-list">
       {appointments.map((appointment) => (
         <div className="timeline-item" key={appointment.id}>
-          <time>{formatDateTime(appointment.startAt)}</time>
+          <time>{formatDateTime(appointment.startAt, language)}</time>
           <div>
-            <strong>{patientName(data.patients.data, appointment.patientId)}</strong>
+            <strong>{patientName(data.patients.data, appointment.patientId).replace("Unknown patient", t("Unknown patient"))}</strong>
             <small>
-              {professionalName(data.professionals.data, appointment.professionalId)} · {roomName(data.rooms.data, appointment.roomId)} ·{" "}
-              {serviceName(data.services.data, appointment.serviceId)}
+              {professionalName(data.professionals.data, appointment.professionalId).replace(
+                "Unknown professional",
+                t("Unknown professional"),
+              )}{" "}
+              · {roomName(data.rooms.data, appointment.roomId).replace("Unknown room", t("Unknown room"))} ·{" "}
+              {serviceName(data.services.data, appointment.serviceId).replace("Unknown service", t("Unknown service"))}
             </small>
             {!compact && appointment.reason ? <p>{appointment.reason}</p> : null}
           </div>
-          <Badge tone={appointmentTone(appointment.status)}>{appointment.status}</Badge>
+          <Badge tone={appointmentTone(appointment.status)}>{t(appointment.status)}</Badge>
           {actions ? actions(appointment) : null}
         </div>
       ))}
@@ -596,6 +645,7 @@ function AppointmentList({
 }
 
 function TreatmentsPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
   const [patientId, setPatientId] = useState("");
   const [episodeId, setEpisodeId] = useState("");
   const refreshTreatments = useRefresh(["dashboard", "auditLogs"]);
@@ -658,51 +708,51 @@ function TreatmentsPage({ data }: { data: CoreData }) {
 
   return (
     <>
-      <PageHeader title="Treatments" eyebrow="Clinical timeline" />
+      <PageHeader title={t("Treatments")} eyebrow={t("Clinical timeline")} />
       <div className="two-column">
-        <Panel title="Episode and note">
+        <Panel title={t("Episode and note")}>
           <div className="stack-form">
-            <SelectField label="Patient" name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
+            <SelectField label={t("Patient")} name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
           </div>
           <form className="stack-form section-divider" onSubmit={submitEpisode}>
-            <SelectField label="Responsible professional" name="responsibleProfessionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
-            <Field label="Episode title">
-              <input name="title" placeholder="Lumbar pain" required />
+            <SelectField label={t("Responsible professional")} name="responsibleProfessionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
+            <Field label={t("Episode title")}>
+              <input name="title" placeholder={t("Lumbar pain")} required />
             </Field>
-            <Field label="Start date">
+            <Field label={t("Start date")}>
               <input name="startDate" type="date" defaultValue={today()} required />
             </Field>
-            <button className="primary-button" type="submit" disabled={!patientId}>Open episode</button>
+            <button className="primary-button" type="submit" disabled={!patientId}>{t("Open episode")}</button>
             {openEpisode.error ? <ErrorBlock message={mutationError(openEpisode.error)} /> : null}
           </form>
           <form className="stack-form section-divider" onSubmit={submitNote}>
-            <SelectField label="Episode" name="episodeId" value={episodeId} onChange={setEpisodeId} items={episodes} render={(item) => `${item.title} · ${item.status}`} />
-            <SelectField label="Professional" name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
-            <SelectField label="Appointment" name="appointmentId" optional items={data.appointments.data ?? []} render={(item) => `${formatDateTime(item.startAt)} · ${item.status}`} />
-            <Field label="Session date">
+            <SelectField label={t("Episode")} name="episodeId" value={episodeId} onChange={setEpisodeId} items={episodes} render={(item) => `${item.title} · ${t(item.status)}`} />
+            <SelectField label={t("Professional")} name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
+            <SelectField label={t("Appointment")} name="appointmentId" optional items={data.appointments.data ?? []} render={(item) => `${formatDateTime(item.startAt, language)} · ${t(item.status)}`} />
+            <Field label={t("Session date")}>
               <input name="sessionDate" type="date" defaultValue={today()} required />
             </Field>
-            <Field label="Pain level">
+            <Field label={t("Pain level")}>
               <input name="painLevel" type="number" min={0} max={10} defaultValue={5} />
             </Field>
-            <Field label="Treated area">
-              <input name="treatedArea" placeholder="Lumbar area" />
+            <Field label={t("Treated area")}>
+              <input name="treatedArea" placeholder={t("Lumbar pain")} />
             </Field>
-            <Field label="Techniques">
+            <Field label={t("Techniques")}>
               <textarea name="techniquesApplied" rows={3} />
             </Field>
-            <Field label="Observations">
+            <Field label={t("Observations")}>
               <textarea name="observations" rows={4} />
             </Field>
-            <Field label="Next recommendation">
+            <Field label={t("Next recommendation")}>
               <textarea name="nextRecommendation" rows={3} />
             </Field>
-            <button className="primary-button" type="submit" disabled={!episodeId}>Add note</button>
+            <button className="primary-button" type="submit" disabled={!episodeId}>{t("Add note")}</button>
             {addNote.error ? <ErrorBlock message={mutationError(addNote.error)} /> : null}
           </form>
         </Panel>
-        <Panel title="Timeline">
-          {!patientId ? <EmptyState title="Select a patient" /> : null}
+        <Panel title={t("Timeline")}>
+          {!patientId ? <EmptyState title={t("Select a patient")} /> : null}
           {timeline.isLoading ? <LoadingBlock /> : null}
           <div className="timeline-list">
             {timeline.data?.episodes.map((line) => (
@@ -713,14 +763,14 @@ function TreatmentsPage({ data }: { data: CoreData }) {
                   <small>{professionalName(data.professionals.data, line.episode.responsibleProfessionalId)}</small>
                   {line.notes.map((note) => (
                     <p key={note.id}>
-                      {note.sessionDate} · pain {note.painLevel ?? "-"} · {note.observations || "No observations"}
+                      {note.sessionDate} · {t("Pain level")} {note.painLevel ?? "-"} · {note.observations || t("No observations")}
                     </p>
                   ))}
                 </div>
-                <Badge tone={line.episode.status === "OPEN" ? "good" : "neutral"}>{line.episode.status}</Badge>
+                <Badge tone={line.episode.status === "OPEN" ? "good" : "neutral"}>{t(line.episode.status)}</Badge>
                 {line.episode.status === "OPEN" ? (
                   <button type="button" onClick={() => closeEpisode.mutate(line.episode.id)}>
-                    Close
+                    {t("Close")}
                   </button>
                 ) : null}
               </div>
@@ -733,6 +783,7 @@ function TreatmentsPage({ data }: { data: CoreData }) {
 }
 
 function PackagesPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
   const [patientId, setPatientId] = useState("");
   const refreshPackages = useRefresh(["packages", "dashboard", "auditLogs"]);
   const patientPackages = useQuery({
@@ -779,16 +830,16 @@ function PackagesPage({ data }: { data: CoreData }) {
 
   return (
     <>
-      <PageHeader title="Packages" eyebrow="Internal payments" />
+      <PageHeader title={t("Packages")} eyebrow={t("Internal payments")} />
       <div className="two-column">
-        <Panel title="Package catalog">
+        <Panel title={t("Package catalog")}>
           <form className="compact-form" onSubmit={submitPackage}>
             <input name="name" placeholder="Bono 5 sesiones" required />
             <input name="totalSessions" type="number" min={1} defaultValue={5} required />
             <input name="price" type="number" min={0} step="0.01" defaultValue={200} />
             <button type="submit">
               <Plus size={16} />
-              Add
+              {t("Add")}
             </button>
           </form>
           <div className="list">
@@ -796,30 +847,30 @@ function PackagesPage({ data }: { data: CoreData }) {
               <div className="list-row" key={item.id}>
                 <span>{item.name}</span>
                 <small>
-                  {item.totalSessions} sessions · {money(item.price)}
+                  {item.totalSessions} {t("sessions")} · {money(item.price, language)}
                 </small>
               </div>
             ))}
           </div>
         </Panel>
-        <Panel title="Patient package">
+        <Panel title={t("Patient package")}>
           <form className="stack-form" onSubmit={submitAssign}>
-            <SelectField label="Patient" name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
-            <SelectField label="Package" name="packageId" items={data.packages.data ?? []} render={(item) => `${item.name} · ${item.totalSessions} sessions`} />
-            <Field label="Paid amount">
+            <SelectField label={t("Patient")} name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
+            <SelectField label={t("Package")} name="packageId" items={data.packages.data ?? []} render={(item) => `${item.name} · ${item.totalSessions} ${t("sessions")}`} />
+            <Field label={t("Paid amount")}>
               <input name="paidAmount" type="number" min={0} step="0.01" defaultValue={120} />
             </Field>
-            <Field label="Payment method">
+            <Field label={t("Payment method")}>
               <input name="paymentMethod" defaultValue="CARD" />
             </Field>
-            <button className="primary-button" type="submit" disabled={!patientId}>Assign package</button>
+            <button className="primary-button" type="submit" disabled={!patientId}>{t("Assign package")}</button>
           </form>
           <div className="list section-divider">
             {(patientPackages.data ?? []).map((item) => (
               <div className="list-row" key={item.id}>
-                <span>{item.remainingSessions} / {item.totalSessions} sessions</span>
+                <span>{item.remainingSessions} / {item.totalSessions} {t("sessions")}</span>
                 <button type="button" onClick={() => consume.mutate(item.id)} disabled={item.remainingSessions <= 0}>
-                  Consume
+                  {t("Consume")}
                 </button>
               </div>
             ))}
@@ -831,6 +882,7 @@ function PackagesPage({ data }: { data: CoreData }) {
 }
 
 function ExercisesPage({ data }: { data: CoreData }) {
+  const { t } = usePreferences();
   const [patientId, setPatientId] = useState("");
   const refreshExercises = useRefresh(["exercises", "auditLogs"]);
   const patientPlans = useQuery({
@@ -881,61 +933,61 @@ function ExercisesPage({ data }: { data: CoreData }) {
 
   return (
     <>
-      <PageHeader title="Exercises" eyebrow="Patient plans" />
+      <PageHeader title={t("Exercises")} eyebrow={t("Patient plans")} />
       <div className="two-column">
-        <Panel title="Exercise catalog">
+        <Panel title={t("Exercise catalog")}>
           <form className="stack-form" onSubmit={submitExercise}>
-            <Field label="Name">
-              <input name="name" placeholder="Glute bridge" required />
+            <Field label={t("Name")}>
+              <input name="name" placeholder={t("Glute bridge")} required />
             </Field>
-            <Field label="Description">
+            <Field label={t("Description")}>
               <textarea name="description" rows={3} />
             </Field>
-            <Field label="Video URL">
+            <Field label={t("Video URL")}>
               <input name="videoUrl" type="url" />
             </Field>
-            <Field label="Image URL">
+            <Field label={t("Image URL")}>
               <input name="imageUrl" type="url" />
             </Field>
-            <button className="primary-button" type="submit">Create exercise</button>
+            <button className="primary-button" type="submit">{t("Create exercise")}</button>
           </form>
           <EntityList items={data.exercises.data ?? []} render={(item) => item.name} />
         </Panel>
-        <Panel title="Assign plan">
+        <Panel title={t("Assign plan")}>
           <form className="stack-form" onSubmit={submitPlan}>
-            <SelectField label="Patient" name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
-            <SelectField label="Professional" name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
-            <SelectField label="Exercise" name="exerciseId" items={data.exercises.data ?? []} render={(item) => item.name} />
-            <Field label="Title">
-              <input name="title" defaultValue="Home plan" required />
+            <SelectField label={t("Patient")} name="patientPicker" value={patientId} onChange={setPatientId} items={data.patients.data ?? []} render={patientNameOption} />
+            <SelectField label={t("Professional")} name="professionalId" items={data.professionals.data ?? []} render={professionalNameOption} />
+            <SelectField label={t("Exercise")} name="exerciseId" items={data.exercises.data ?? []} render={(item) => item.name} />
+            <Field label={t("Title")}>
+              <input name="title" defaultValue={t("Home plan")} required />
             </Field>
-            <Field label="Starts on">
+            <Field label={t("Starts on")}>
               <input name="startsOn" type="date" defaultValue={today()} required />
             </Field>
             <div className="form-grid">
-              <Field label="Series">
+              <Field label={t("Series")}>
                 <input name="series" type="number" min={1} defaultValue={3} />
               </Field>
-              <Field label="Reps">
+              <Field label={t("Reps")}>
                 <input name="repetitions" type="number" min={1} defaultValue={12} />
               </Field>
             </div>
-            <Field label="Frequency">
-              <input name="frequency" defaultValue="4 days/week" />
+            <Field label={t("Frequency")}>
+              <input name="frequency" defaultValue={t("4 days/week")} />
             </Field>
-            <Field label="Notes">
+            <Field label={t("Notes")}>
               <textarea name="notes" rows={3} />
             </Field>
-            <Field label="Item notes">
+            <Field label={t("Item notes")}>
               <textarea name="itemNotes" rows={3} />
             </Field>
-            <button className="primary-button" type="submit" disabled={!patientId}>Assign plan</button>
+            <button className="primary-button" type="submit" disabled={!patientId}>{t("Assign plan")}</button>
           </form>
           <div className="list section-divider">
             {(patientPlans.data ?? []).map((plan) => (
               <div className="list-row" key={plan.id}>
                 <span>{plan.title}</span>
-                <small>{plan.items.length} exercise</small>
+                <small>{plan.items.length} {t("Exercise").toLowerCase()}</small>
               </div>
             ))}
           </div>
@@ -946,20 +998,22 @@ function ExercisesPage({ data }: { data: CoreData }) {
 }
 
 function AuditPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
+
   return (
     <>
-      <PageHeader title="Audit" eyebrow="Clinical access trace" />
-      <Panel title="Recent events">
+      <PageHeader title={t("Audit")} eyebrow={t("Clinical access trace")} />
+      <Panel title={t("Recent events")}>
         <div className="audit-list">
           {(data.auditLogs.data ?? []).map((log) => (
             <div className="audit-row" key={log.id}>
-              <time>{formatDateTime(log.occurredAt)}</time>
+              <time>{formatDateTime(log.occurredAt, language)}</time>
               <strong>{log.action}</strong>
               <span>{log.resourceType}</span>
               <small>{log.details}</small>
             </div>
           ))}
-          {data.auditLogs.data?.length === 0 ? <EmptyState title="No audit events yet" /> : null}
+          {data.auditLogs.data?.length === 0 ? <EmptyState title={t("No audit events yet")} /> : null}
         </div>
       </Panel>
     </>
@@ -983,10 +1037,12 @@ function SelectField<T extends { id: string }>({
   onChange?: (value: string) => void;
   optional?: boolean;
 }) {
+  const { t } = usePreferences();
+
   return (
     <Field label={label}>
       <select name={name} value={value} onChange={(event) => onChange?.(event.target.value)} required={!optional}>
-        <option value="">{optional ? "None" : "Select"}</option>
+        <option value="">{optional ? t("None") : t("Select")}</option>
         {items.map((item) => (
           <option key={item.id} value={item.id}>
             {render(item)}

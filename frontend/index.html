@@ -6,6 +6,12 @@
     <title>ClinicCore</title>
   </head>
   <body>
+    <script>
+      const theme = localStorage.getItem("cliniccore.theme");
+      const language = localStorage.getItem("cliniccore.language");
+      document.documentElement.dataset.theme = theme === "dark" ? "dark" : "light";
+      document.documentElement.lang = language === "es" ? "es" : "en";
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

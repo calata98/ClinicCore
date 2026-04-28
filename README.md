@@ -100,6 +100,7 @@ The API will be available at:
 ## Frontend
 
 The frontend lives in `frontend/` and is built with React, TypeScript, Vite, TanStack Query, React Router, and lucide-react.
+It includes persisted user preferences for light/dark theme and English/Spanish language.
 
 Start the backend first, then run:
 

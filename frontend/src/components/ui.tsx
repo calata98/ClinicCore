@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import { AlertCircle, LoaderCircle } from "lucide-react";
+import { usePreferences } from "../preferences/preferences";
 
 export function PageHeader({
   title,
@@ -43,10 +44,12 @@ export function EmptyState({ title, detail }: { title: string; detail?: string }
 }
 
 export function LoadingBlock() {
+  const { t } = usePreferences();
+
   return (
     <div className="state-line">
       <LoaderCircle className="spin" size={16} />
-      Loading
+      {t("Loading")}
     </div>
   );
 }
