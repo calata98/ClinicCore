@@ -63,13 +63,8 @@ The `local` profile uses a file-based H2 database under `.local-data/`, keeps Fl
 
 ### PostgreSQL Setup With Docker
 
-If Docker Desktop is not installed yet, run this script from an elevated PowerShell terminal:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\install-docker-desktop.ps1
-```
-
-If the script is not already running as Administrator, it will ask Windows to relaunch it with UAC. Docker Desktop may require Windows to restart after installation. After restarting, open Docker Desktop once before running `docker compose`.
+If Docker Desktop is not installed yet, install it from the official Docker Desktop installer for Windows.
+Docker Desktop may require Windows to restart after installation. After restarting, open Docker Desktop once before running `docker compose`.
 
 Start PostgreSQL:
 
@@ -101,6 +96,31 @@ The API will be available at:
 - Swagger UI: `http://localhost:8080/swagger-ui`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 - H2 console when using the `local` profile: `http://localhost:8080/h2-console`
+
+## Frontend
+
+The frontend lives in `frontend/` and is built with React, TypeScript, Vite, TanStack Query, React Router, and lucide-react.
+
+Start the backend first, then run:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will be available at:
+
+- `http://127.0.0.1:5173`
+
+Vite proxies `/api`, `/actuator`, and `/v3` to `http://localhost:8080`, so the browser does not need backend CORS enabled during local development.
+
+Build the frontend:
+
+```powershell
+cd frontend
+npm run build
+```
 
 ## Demo User
 
