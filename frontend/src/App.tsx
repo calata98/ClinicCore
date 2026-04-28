@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, FormEvent, ReactNode, useEffect, useState } from "react";
+import { Component, ErrorInfo, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,6 +32,7 @@ const navItems = [
   { to: "/clinic", label: "Clinic", icon: Stethoscope },
   { to: "/patients", label: "Patients", icon: Users },
   { to: "/agenda", label: "Agenda", icon: CalendarDays },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/treatments", label: "Treatments", icon: ClipboardList },
   { to: "/packages", label: "Packages", icon: PackageCheck },
   { to: "/exercises", label: "Exercises", icon: Dumbbell },
@@ -64,10 +65,80 @@ function formatDateTime(value?: string, language: "en" | "es" = "en") {
   }).format(new Date(value));
 }
 
+function formatTime(value?: string, language: "en" | "es" = "en") {
+  if (!value) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function money(value?: number, language: "en" | "es" = "en") {
   return new Intl.NumberFormat(language === "es" ? "es-ES" : "en", { style: "currency", currency: "EUR" }).format(
     value ?? 0,
   );
+}
+
+function startOfDay(value: Date) {
+  const result = new Date(value);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function addDays(value: Date, days: number) {
+  const result = new Date(value);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function startOfWeek(value: Date) {
+  const result = startOfDay(value);
+  const mondayOffset = (result.getDay() + 6) % 7;
+  result.setDate(result.getDate() - mondayOffset);
+  return result;
+}
+
+function endOfWeek(value: Date) {
+  const result = addDays(startOfWeek(value), 6);
+  result.setHours(23, 59, 59, 999);
+  return result;
+}
+
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function calendarRange(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+  const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const gridStart = startOfWeek(firstDay);
+  const gridEnd = endOfWeek(lastDay);
+  const days: Date[] = [];
+
+  for (let day = gridStart; day <= gridEnd; day = addDays(day, 1)) {
+    days.push(new Date(day));
+  }
+
+  return { days, from: gridStart.toISOString(), to: gridEnd.toISOString() };
+}
+
+function monthTitle(value: Date, language: "en" | "es") {
+  const title = new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en", {
+    month: "long",
+    year: "numeric",
+  }).format(value);
+  return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
+function weekdayLabels(language: "en" | "es") {
+  const formatter = new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en", { weekday: "short" });
+  const monday = new Date(2024, 0, 1);
+  return Array.from({ length: 7 }, (_, index) => formatter.format(addDays(monday, index)));
 }
 
 class AppErrorBoundary extends Component<{ children: ReactNode; title: string }, { message: string | null }> {
@@ -280,6 +351,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
           <Route path="/clinic" element={<ClinicPage data={data} />} />
           <Route path="/patients" element={<PatientsPage />} />
           <Route path="/agenda" element={<AgendaPage data={data} />} />
+          <Route path="/calendar" element={<CalendarPage data={data} />} />
           <Route path="/treatments" element={<TreatmentsPage data={data} />} />
           <Route path="/packages" element={<PackagesPage data={data} />} />
           <Route path="/exercises" element={<ExercisesPage data={data} />} />
@@ -610,6 +682,148 @@ function AgendaPage({ data }: { data: CoreData }) {
               </div>
             )}
           />
+        </Panel>
+      </div>
+    </>
+  );
+}
+
+function CalendarPage({ data }: { data: CoreData }) {
+  const { language, t } = usePreferences();
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const range = useMemo(() => calendarRange(visibleMonth), [visibleMonth]);
+  const weekDays = useMemo(() => weekdayLabels(language), [language]);
+  const calendarAppointments = useQuery({
+    queryKey: ["calendarAppointments", range.from, range.to],
+    queryFn: () => api.appointments(range.from, range.to),
+  });
+  const appointments = calendarAppointments.data ?? [];
+  const appointmentsByDate = useMemo(() => {
+    const grouped = new Map<string, Appointment[]>();
+
+    appointments.forEach((appointment) => {
+      const key = localDateKey(new Date(appointment.startAt));
+      const dayAppointments = grouped.get(key) ?? [];
+      dayAppointments.push(appointment);
+      grouped.set(key, dayAppointments);
+    });
+
+    grouped.forEach((dayAppointments) =>
+      dayAppointments.sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime()),
+    );
+
+    return grouped;
+  }, [appointments]);
+  const todayKey = localDateKey(new Date());
+  const selectedKey = localDateKey(selectedDate);
+  const selectedAppointments = appointmentsByDate.get(selectedKey) ?? [];
+  const selectedDateLabel = new Intl.DateTimeFormat(language === "es" ? "es-ES" : "en", {
+    dateStyle: "full",
+  }).format(selectedDate);
+
+  function moveMonth(monthOffset: number) {
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + monthOffset, 1);
+    setVisibleMonth(nextMonth);
+    setSelectedDate(nextMonth);
+  }
+
+  function goToToday() {
+    const now = startOfDay(new Date());
+    setVisibleMonth(now);
+    setSelectedDate(now);
+  }
+
+  return (
+    <>
+      <PageHeader
+        title={t("Calendar")}
+        eyebrow={t("Calendar view")}
+        actions={
+          <div className="calendar-toolbar">
+            <button type="button" onClick={() => moveMonth(-1)}>
+              {t("Previous")}
+            </button>
+            <button type="button" onClick={goToToday}>
+              {t("Today")}
+            </button>
+            <button type="button" onClick={() => moveMonth(1)}>
+              {t("Next")}
+            </button>
+          </div>
+        }
+      />
+      {calendarAppointments.isLoading ? <LoadingBlock /> : null}
+      {calendarAppointments.error ? <ErrorBlock message={mutationError(calendarAppointments.error)} /> : null}
+      <div className="calendar-layout">
+        <section className="calendar-board" aria-label={t("Month calendar")}>
+          <div className="calendar-title-row">
+            <h2>{monthTitle(visibleMonth, language)}</h2>
+            <Badge>{appointments.length} {t("appointments")}</Badge>
+          </div>
+          <div className="calendar-grid">
+            {weekDays.map((day) => (
+              <div className="calendar-weekday" key={day}>
+                {day}
+              </div>
+            ))}
+            {range.days.map((day) => {
+              const key = localDateKey(day);
+              const dayAppointments = appointmentsByDate.get(key) ?? [];
+              const className = [
+                "calendar-day",
+                day.getMonth() !== visibleMonth.getMonth() ? "calendar-day-outside" : "",
+                key === selectedKey ? "calendar-day-selected" : "",
+                key === todayKey ? "calendar-day-today" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <button type="button" className={className} key={key} onClick={() => setSelectedDate(day)}>
+                  <span className="calendar-day-number">{day.getDate()}</span>
+                  <div className="calendar-events">
+                    {dayAppointments.slice(0, 3).map((appointment) => (
+                      <span className={`calendar-event calendar-event-${appointment.status.toLowerCase().replace("_", "-")}`} key={appointment.id}>
+                        <strong>{formatTime(appointment.startAt, language)}</strong>
+                        {patientName(data.patients.data, appointment.patientId).replace("Unknown patient", t("Unknown patient"))}
+                      </span>
+                    ))}
+                    {dayAppointments.length > 3 ? (
+                      <span className="calendar-day-more">+{dayAppointments.length - 3} {t("more")}</span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+        <Panel title={t("Day appointments")}>
+          <div className="calendar-detail-heading">
+            <strong>{selectedDateLabel}</strong>
+            <Badge>{selectedAppointments.length} {t("appointments")}</Badge>
+          </div>
+          <div className="calendar-detail-list">
+            {selectedAppointments.length === 0 ? <EmptyState title={t("No appointments this day")} /> : null}
+            {selectedAppointments.map((appointment) => (
+              <div className={`calendar-detail-item calendar-detail-${appointment.status.toLowerCase().replace("_", "-")}`} key={appointment.id}>
+                <time>
+                  {formatTime(appointment.startAt, language)} - {formatTime(appointment.endAt, language)}
+                </time>
+                <strong>{patientName(data.patients.data, appointment.patientId).replace("Unknown patient", t("Unknown patient"))}</strong>
+                <small>
+                  {professionalName(data.professionals.data, appointment.professionalId).replace(
+                    "Unknown professional",
+                    t("Unknown professional"),
+                  )}{" "}
+                  Â· {roomName(data.rooms.data, appointment.roomId).replace("Unknown room", t("Unknown room"))} Â·{" "}
+                  {serviceName(data.services.data, appointment.serviceId).replace("Unknown service", t("Unknown service"))}
+                </small>
+                {appointment.reason ? <p>{appointment.reason}</p> : null}
+                <Badge tone={appointmentTone(appointment.status)}>{t(appointment.status)}</Badge>
+              </div>
+            ))}
+          </div>
         </Panel>
       </div>
     </>

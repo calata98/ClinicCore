@@ -18,7 +18,7 @@ Included:
 - Treatment episodes and clinical progress notes.
 - Session packages and session consumption.
 - Exercise catalog and exercise plans assigned to patients.
-- Basic clinic activity dashboard.
+- Basic clinic activity dashboard and monthly appointment calendar in the frontend.
 - Audit events for relevant operations.
 - Flyway, PostgreSQL, Swagger/OpenAPI, tests, Docker Compose, Dockerfile, and GitHub Actions CI.
 
@@ -100,7 +100,7 @@ The API will be available at:
 ## Frontend
 
 The frontend lives in `frontend/` and is built with React, TypeScript, Vite, TanStack Query, React Router, and lucide-react.
-It includes persisted user preferences for light/dark theme and English/Spanish language.
+It includes persisted user preferences for light/dark theme and English/Spanish language, plus a monthly calendar view for appointments.
 
 Start the backend first, then run:
 
