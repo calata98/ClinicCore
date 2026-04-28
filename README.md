@@ -1,28 +1,28 @@
 # ClinicCore
 
-ClinicCore es un MVP backend para que una clinica pequena gestione pacientes, agenda, tratamientos, notas de sesion, bonos, ejercicios, dashboard y auditoria de accesos.
+ClinicCore is a backend MVP for small clinics to manage patients, scheduling, treatment episodes, session notes, session packages, exercise plans, clinic dashboards, and audit logs.
 
-El proyecto esta creado con Java 25 y Spring Boot 4.0.5. Spring Boot 4.0.x declara soporte para Java 17 hasta Java 26, asi que Java 25 encaja dentro del rango soportado.
+The project is built with Java 25 and Spring Boot 4.0.5. Spring Boot 4.0.x supports Java 17 through Java 26, so Java 25 is within the supported range.
 
-## Estado del MVP
+## MVP Status
 
-Incluye:
+Included:
 
-- Login con BCrypt, JWT de acceso y refresh tokens rotados.
-- Roles base: `OWNER`, `ADMIN`, `PROFESSIONAL`, `RECEPTIONIST`, `PATIENT`.
-- Tenant por clinica en las operaciones principales.
-- Clinicas, profesionales, salas y servicios.
-- Pacientes con separacion de notas administrativas.
-- Agenda con creacion, reprogramacion, cancelacion, completado y no-show.
-- Validacion de solapamientos por profesional y sala.
-- Episodios de tratamiento y notas evolutivas.
-- Bonos de sesiones y consumo de sesiones.
-- Catalogo de ejercicios y planes asignados al paciente.
-- Dashboard basico de actividad.
-- Auditoria de eventos relevantes.
-- Flyway, PostgreSQL, Swagger/OpenAPI, tests, Docker Compose, Dockerfile y CI en GitHub Actions.
+- Login with BCrypt, short-lived JWT access tokens, and rotated refresh tokens.
+- Base roles: `OWNER`, `ADMIN`, `PROFESSIONAL`, `RECEPTIONIST`, `PATIENT`.
+- Clinic tenant isolation in the main workflows.
+- Clinics, professionals, rooms, and services.
+- Patients with administrative notes kept separate from clinical notes.
+- Scheduling with create, reschedule, cancel, complete, and no-show actions.
+- Overlap validation by professional and room.
+- Treatment episodes and clinical progress notes.
+- Session packages and session consumption.
+- Exercise catalog and exercise plans assigned to patients.
+- Basic clinic activity dashboard.
+- Audit events for relevant operations.
+- Flyway, PostgreSQL, Swagger/OpenAPI, tests, Docker Compose, Dockerfile, and GitHub Actions CI.
 
-No incluye todavia facturacion legal, documentos adjuntos, firma digital, recordatorios por email, portal real de paciente ni integraciones externas.
+Not included yet: legal invoicing, file attachments, digital signatures, email reminders, a real patient portal, or external integrations.
 
 ## Stack
 
@@ -33,52 +33,52 @@ No incluye todavia facturacion legal, documentos adjuntos, firma digital, record
 - PostgreSQL 18
 - Flyway
 - Maven Wrapper
-- JUnit 6, MockMvc, H2 en tests
+- JUnit 6, MockMvc, and H2 for tests
 - Springdoc OpenAPI
 
-## Arranque local
+## Local Setup
 
-Requisitos:
+Requirements:
 
 - JDK 25
-- Docker, o una instancia PostgreSQL local compatible
+- Docker, or a compatible local PostgreSQL instance
 
-Levantar PostgreSQL:
+Start PostgreSQL:
 
 ```powershell
 docker compose up -d
 ```
 
-Ejecutar tests:
+Run tests:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-Arrancar la API:
+Start the API:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-Construir imagen Docker:
+Build the Docker image:
 
 ```powershell
 docker build -t cliniccore:local .
 ```
 
-La API queda en:
+The API will be available at:
 
 - `http://localhost:8080`
 - Swagger UI: `http://localhost:8080/swagger-ui`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-## Usuario demo
+## Demo User
 
-Con `CLINICCORE_BOOTSTRAP_DEMO=true`, la aplicacion crea datos iniciales:
+With `CLINICCORE_BOOTSTRAP_DEMO=true`, the application creates initial demo data:
 
-- Clinica: `Fisio Norte`
-- Usuario: `owner@cliniccore.local`
+- Clinic: `Fisio Norte`
+- User: `owner@cliniccore.local`
 - Password: `ChangeMe123!`
 
 Login:
@@ -93,15 +93,15 @@ Content-Type: application/json
 }
 ```
 
-Usa el `accessToken` devuelto como:
+Use the returned `accessToken` as:
 
 ```http
 Authorization: Bearer <accessToken>
 ```
 
-## Configuracion
+## Configuration
 
-Puedes copiar `.env.example` o definir estas variables:
+You can copy `.env.example` or define these environment variables:
 
 ```text
 CLINICCORE_DB_URL=jdbc:postgresql://localhost:5432/cliniccore
@@ -111,15 +111,15 @@ CLINICCORE_JWT_SECRET=replace-this-with-a-long-random-secret-for-local-dev
 CLINICCORE_BOOTSTRAP_DEMO=true
 ```
 
-## Endpoints principales
+## Main Endpoints
 
-Autenticacion:
+Authentication:
 
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `GET /api/auth/me`
 
-Clinica:
+Clinic:
 
 - `GET /api/clinics/current`
 - `POST /api/professionals`
@@ -129,7 +129,7 @@ Clinica:
 - `POST /api/services`
 - `GET /api/services`
 
-Pacientes:
+Patients:
 
 - `POST /api/patients`
 - `GET /api/patients?search=juan`
@@ -137,7 +137,7 @@ Pacientes:
 - `PATCH /api/patients/{patientId}`
 - `DELETE /api/patients/{patientId}`
 
-Agenda:
+Scheduling:
 
 - `POST /api/appointments`
 - `GET /api/appointments?from=2026-04-28T08:00:00Z&to=2026-04-29T08:00:00Z`
@@ -146,14 +146,14 @@ Agenda:
 - `PATCH /api/appointments/{appointmentId}/complete`
 - `PATCH /api/appointments/{appointmentId}/no-show`
 
-Tratamientos:
+Treatments:
 
 - `POST /api/patients/{patientId}/episodes`
 - `PATCH /api/episodes/{episodeId}/close`
 - `POST /api/episodes/{episodeId}/session-notes`
 - `GET /api/patients/{patientId}/timeline`
 
-Bonos:
+Packages:
 
 - `POST /api/packages`
 - `GET /api/packages`
@@ -161,21 +161,21 @@ Bonos:
 - `GET /api/patients/{patientId}/packages`
 - `PATCH /api/patient-packages/{patientPackageId}/consume-session`
 
-Ejercicios:
+Exercises:
 
 - `POST /api/exercises`
 - `GET /api/exercises`
 - `POST /api/patients/{patientId}/exercise-plans`
 - `GET /api/patients/{patientId}/exercise-plans`
 
-Dashboard y auditoria:
+Dashboard and audit:
 
 - `GET /api/dashboard/clinic`
 - `GET /api/audit-logs`
 
-## Arquitectura
+## Architecture
 
-El proyecto sigue un monolito modular con direccion hexagonal:
+The project follows a modular monolith with hexagonal direction:
 
 ```text
 src/main/java/com/cliniccore
@@ -191,53 +191,53 @@ src/main/java/com/cliniccore
   treatment/
 ```
 
-Dentro de cada modulo:
+Inside each module:
 
 ```text
-api              REST controllers y DTOs
-application      casos de uso
-domain           reglas y conceptos de negocio
-infrastructure   JPA, seguridad y adaptadores
+api              REST controllers and DTOs
+application      use cases
+domain           business rules and domain concepts
+infrastructure   JPA, security, and adapters
 ```
 
-Ver tambien `docs/adr/0001-architecture.md`.
+See also `docs/adr/0001-architecture.md`.
 
-## Seguridad y cumplimiento
+## Security and Compliance Notes
 
-El MVP aplica una base seria:
+The MVP includes a serious baseline:
 
-- Passwords con BCrypt.
-- JWT de vida corta.
-- Refresh tokens guardados con hash SHA-256 y rotacion.
-- Roles por endpoint.
-- Operaciones filtradas por `clinicId`.
-- Auditoria de login, lectura de paciente, timeline clinico, agenda, notas, bonos y dashboard.
-- Flyway para evolucion controlada de esquema.
+- Passwords are hashed with BCrypt.
+- Access tokens are short-lived JWTs.
+- Refresh tokens are stored as SHA-256 hashes and rotated.
+- Endpoints are protected by roles.
+- Main operations are scoped by `clinicId`.
+- Login, patient reads, clinical timeline reads, scheduling, notes, packages, and dashboard access are audited.
+- Flyway controls schema evolution.
 
-La aplicacion evita interpretar datos clinicos. Las notas evolutivas son texto introducido por el profesional. Aun faltan piezas para un producto sanitario completo: gestion avanzada de consentimientos/documentos, politicas de retencion, exportacion completa, cifrado de adjuntos, permisos granulares y revision legal especifica.
+The application does not interpret clinical data. Progress notes are free text written by the professional. A production healthcare product would still need more work: advanced consent/document management, retention policies, full data export, attachment encryption, granular permissions, and a dedicated legal review.
 
 ## Tests
 
-Actualmente hay:
+Current tests:
 
-- `ClinicCoreApplicationTests`: arranque de contexto con H2 y Flyway.
-- `AuthControllerTests`: login demo y lectura de perfil con JWT.
-- `AppointmentRulesTests`: reglas de solapamiento y rangos invalidos.
+- `ClinicCoreApplicationTests`: application context startup with H2 and Flyway.
+- `AuthControllerTests`: demo login and JWT-protected profile read.
+- `AppointmentRulesTests`: overlap and invalid time range rules.
 
-Ejecutar:
+Run:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-## Roadmap sugerido
+## Suggested Roadmap
 
-1. Crear usuarios y asignar roles desde API.
-2. Disponibilidad de profesionales, vacaciones y ausencias.
-3. Portal de paciente.
-4. Documentos, consentimientos versionados y adjuntos.
-5. Recordatorios por email.
-6. Exportacion PDF de resumen clinico.
-7. Testcontainers con PostgreSQL real en CI.
-8. Permisos granulares.
-9. Busqueda avanzada y filtros de agenda.
+1. User creation and role assignment API.
+2. Professional availability, holidays, and absences.
+3. Patient portal.
+4. Versioned consent documents and attachments.
+5. Email reminders.
+6. Clinical summary PDF export.
+7. Testcontainers with real PostgreSQL in CI.
+8. Granular permissions.
+9. Advanced search and scheduling filters.
